@@ -1,0 +1,177 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Visibility {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String?
+  username      String   @unique
+  email         String   @unique
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // The single Google Photos album created for this user on signup.
+  // Every photo "uploaded" to the site actually lands in this album.
+  googlePhotosAlbumId String?
+
+  // Profile customization ("Myspace-style" but XSS-safe: structured
+  // theme fields instead of raw injected HTML/CSS).
+  aboutMe        String? @db.Text
+  mood           String?
+  bannerColor    String  @default("#1a0d3d")
+  accentColor    String  @default("#ff00c8")
+  textColor      String  @default("#e6e6ff")
+  fontChoice     String  @default("comic")
+  backgroundTile String  @default("stars")
+  profileSongUrl String?
+
+  accounts       Account[]
+  sessions       Session[]
+
+  photos         Photo[]
+  statuses       Status[]
+
+  friendRequestsSent     Friendship[] @relation("FriendshipRequester")
+  friendRequestsReceived Friendship[] @relation("FriendshipAddressee")
+
+  topFriendsOf   TopFriend[] @relation("TopFriendOwner")
+  topFriendOf    TopFriend[] @relation("TopFriendTarget")
+
+  wallPostsWritten  WallPost[] @relation("WallPostAuthor")
+  wallPostsReceived WallPost[] @relation("WallPostProfile")
+}
+
+// NextAuth adapter models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// A photo "uploaded" to the site. The bytes live in the user's Google
+// Photos album; we only store the Google mediaItem reference plus the
+// visibility/caption metadata that Google Photos has no concept of.
+model Photo {
+  id             String     @id @default(cuid())
+  ownerId        String
+  owner          User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  googleMediaId  String     @unique
+  caption        String?
+  visibility     Visibility @default(FRIENDS)
+  sortOrder      Int        @default(0)
+  createdAt      DateTime   @default(now())
+
+  wallPosts WallPost[]
+
+  @@index([ownerId])
+}
+
+model Friendship {
+  id           String           @id @default(cuid())
+  requesterId  String
+  addresseeId  String
+  status       FriendshipStatus @default(PENDING)
+  createdAt    DateTime         @default(now())
+  respondedAt  DateTime?
+
+  requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId])
+}
+
+// The classic "Top 8" friends list, ranked.
+model TopFriend {
+  id        String @id @default(cuid())
+  ownerId   String
+  targetId  String
+  rank      Int
+
+  owner  User @relation("TopFriendOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  target User @relation("TopFriendTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, targetId])
+  @@unique([ownerId, rank])
+}
+
+// A comment left on someone's profile wall ("testimonials").
+model WallPost {
+  id         String     @id @default(cuid())
+  authorId   String
+  profileId  String
+  photoId    String?
+  body       String     @db.Text
+  visibility Visibility @default(PUBLIC)
+  createdAt  DateTime   @default(now())
+
+  author  User   @relation("WallPostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  profile User   @relation("WallPostProfile", fields: [profileId], references: [id], onDelete: Cascade)
+  photo   Photo? @relation(fields: [photoId], references: [id], onDelete: SetNull)
+
+  @@index([profileId])
+}
+
+// Short status updates, shown on the owner's profile and in friends' feeds.
+model Status {
+  id         String     @id @default(cuid())
+  authorId   String
+  body       String
+  visibility Visibility @default(FRIENDS)
+  createdAt  DateTime   @default(now())
+
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+}
