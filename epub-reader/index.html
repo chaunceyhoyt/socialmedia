@@ -1,0 +1,1417 @@
+<!doctype html><!--pwa-->
+<html lang="en"><!--pwa-->
+<head><!--pwa-->
+<meta charset="utf-8"><!--pwa-->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><!--pwa-->
+<title>Folio Reader</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Read EPUB books or have them read aloud. One bookmark is shared by both."><!--pwa-->
+<meta name="theme-color" content="#F4F5F9"><!--pwa-->
+<link rel="manifest" href="manifest.webmanifest"><!--pwa-->
+<link rel="icon" href="icon.svg" type="image/svg+xml"><!--pwa-->
+<link rel="apple-touch-icon" href="icon-180.png"><!--pwa-->
+<meta name="apple-mobile-web-app-capable" content="yes"><!--pwa-->
+<style>html{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style><!--pwa-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap">
+<style>
+/* Layout: one-screen app. A shelf of books, or a reader: a single text column between a slim top bar and a narration dock. */
+:root{
+  --paper:#F4F5F9;      /* page ground, a cool paper */
+  --surface:#FFFFFF;    /* bars, drawers, cards */
+  --ink:#1A1F2E;        /* body text */
+  --ink-soft:#5B6276;   /* secondary text */
+  --line:#DADFEA;       /* hairlines, tracks */
+  --accent:#3445A8;     /* ink-blue: play, progress, links */
+  --accent-ink:#FFFFFF;
+  --mark:rgba(255,204,51,.45);      /* highlighter on the spoken sentence */
+  --mark-soft:rgba(255,204,51,.16);
+  --scrim:rgba(16,19,30,.42);
+  --f-book:"Literata", Georgia, "Times New Roman", serif;
+  --f-sans:"Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-ui:"Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --text-size:19px;
+  --book-font:var(--f-book);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#12141B; --surface:#1A1D27; --ink:#E3E5ED; --ink-soft:#9CA3B6; --line:#2B303E;
+    --accent:#9DABFF; --accent-ink:#11131A; --mark:rgba(255,196,60,.32); --mark-soft:rgba(255,196,60,.12);
+    --scrim:rgba(0,0,0,.6); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#12141B; --surface:#1A1D27; --ink:#E3E5ED; --ink-soft:#9CA3B6; --line:#2B303E;
+  --accent:#9DABFF; --accent-ink:#11131A; --mark:rgba(255,196,60,.32); --mark-soft:rgba(255,196,60,.12);
+  --scrim:rgba(0,0,0,.6); color-scheme:dark;
+}
+/* Reader colour choices made inside the app win over the system theme. */
+.reader[data-rtheme="paper"]{
+  --paper:#FBFBF8; --surface:#FFFFFF; --ink:#1C1F27; --ink-soft:#5E6372; --line:#E1E3EA;
+  --accent:#3445A8; --accent-ink:#FFFFFF; --mark:rgba(255,204,51,.45); --mark-soft:rgba(255,204,51,.16); color-scheme:light;
+}
+.reader[data-rtheme="sepia"]{
+  --paper:#F2E8D5; --surface:#F8F1E3; --ink:#3A2E21; --ink-soft:#76664F; --line:#E0D2B8;
+  --accent:#8A4A1C; --accent-ink:#FFF8EE; --mark:rgba(222,150,30,.33); --mark-soft:rgba(222,150,30,.13); color-scheme:light;
+}
+.reader[data-rtheme="night"]{
+  --paper:#0E0F13; --surface:#16181F; --ink:#C9CCD6; --ink-soft:#8A90A0; --line:#262A35;
+  --accent:#A8B4FF; --accent-ink:#0E0F13; --mark:rgba(255,190,60,.26); --mark-soft:rgba(255,190,60,.10); color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.45;overflow:hidden;-webkit-tap-highlight-color:transparent}
+#app{height:100%}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- Library ---------- */
+.library{height:100%;overflow-y:auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+.shelf{max-width:1000px;margin:0 auto;display:grid;gap:28px}
+.masthead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+.brand{margin:0;font-family:var(--f-book);font-style:italic;font-weight:400;font-size:40px;line-height:1;letter-spacing:-.01em}
+.tagline{margin:6px 0 0;color:var(--ink-soft);font-size:15px}
+.btn{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:999px;padding:11px 18px;font-weight:600;font-size:15px;background:var(--accent);color:var(--accent-ink)}
+.btn svg{width:18px;height:18px}
+.btn-quiet{background:transparent;color:var(--accent);padding-inline:10px}
+.howto{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.howto div{background:var(--surface);padding:14px 16px;min-width:0}
+.howto b{display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:4px;font-weight:600}
+.howto p{margin:0;color:var(--ink-soft);font-size:14px}
+@media (max-width:640px){.howto{grid-template-columns:1fr}}
+.shelf-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.shelf-head h2{margin:0;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+.shelf-head span{font-size:13px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.books{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:28px 20px}
+.book{position:relative;min-width:0}
+.book-open{display:grid;gap:10px;width:100%;padding:0;border:0;background:none;text-align:left}
+.cover{aspect-ratio:2/3;max-width:100%;border-radius:3px 6px 6px 3px;overflow:hidden;background:var(--line);box-shadow:0 1px 2px rgba(0,0,0,.12),0 6px 18px -8px rgba(0,0,0,.35);position:relative}
+.cover::after{content:"";position:absolute;inset:0 auto 0 0;width:6px;background:linear-gradient(90deg,rgba(0,0,0,.18),rgba(0,0,0,0))}
+.cover img{width:100%;height:100%;object-fit:cover;display:block}
+.cover-gen{height:100%;display:flex;flex-direction:column;justify-content:space-between;padding:14px 12px 12px 16px;color:#fff;font-family:var(--f-book)}
+.cover-gen .ct{font-size:17px;line-height:1.2;text-wrap:balance;overflow-wrap:anywhere}
+.cover-gen .ca{font-family:var(--f-ui);font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.8}
+.book-title{font-weight:600;font-size:15px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.book-author{color:var(--ink-soft);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.book-track{height:3px;border-radius:2px;background:var(--line);overflow:hidden}
+.book-track i{display:block;height:100%;background:var(--accent)}
+.book-meta{font-size:12px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.book-meta .mode{color:var(--ink)}
+.book-remove{position:absolute;top:6px;right:6px;z-index:2;border:0;border-radius:999px;background:rgba(15,17,25,.55);color:#fff;font-size:12px;padding:5px 9px;opacity:0;transition:opacity .15s}
+.book:hover .book-remove,.book:focus-within .book-remove,.book-remove.confirm{opacity:1}
+.book-remove.confirm{background:#B3261E}
+@media (hover:none){.book-remove{opacity:.85}}
+.empty{border:1.5px dashed var(--line);border-radius:12px;padding:28px 20px;text-align:center;color:var(--ink-soft)}
+.empty p{margin:0 0 12px}
+.dropping .shelf{outline:2px dashed var(--accent);outline-offset:8px;border-radius:12px}
+.foot{color:var(--ink-soft);font-size:13px;max-width:60ch}
+
+/* ---------- Reader ---------- */
+.reader{height:100%;display:flex;flex-direction:column;background:var(--paper);color:var(--ink)}
+.topbar{flex:none;display:flex;align-items:center;gap:6px;background:var(--surface);border-bottom:1px solid var(--line);padding-block:6px;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
+.icon-btn{flex:none;display:inline-grid;place-items:center;width:42px;height:42px;border:0;border-radius:999px;background:transparent;color:var(--ink)}
+.icon-btn:hover{background:var(--mark-soft)}
+.icon-btn svg{width:22px;height:22px}
+.aa{font-family:var(--f-book);font-size:19px;line-height:1}
+.titles{flex:1;min-width:0;text-align:center;line-height:1.2}
+.titles b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.titles span{display:block;font-size:12px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.page{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.book-text{max-width:34em;margin:0 auto;padding-block:28px 24px;font-family:var(--book-font);font-size:var(--text-size);line-height:1.65;overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto}
+.book-text p{margin:0 0 .85em}
+.book-text h1,.book-text h2,.book-text h3,.book-text h4{font-weight:600;line-height:1.25;text-wrap:balance;margin:1.4em 0 .7em}
+.book-text h1{font-size:1.55em}.book-text h2{font-size:1.3em}.book-text h3{font-size:1.12em}.book-text h4{font-size:1em}
+.book-text img,.book-text svg{max-width:100%;height:auto;display:block;margin:1em auto}
+.book-text a{color:var(--accent)}
+.book-text blockquote{margin:1em 0;padding-left:1em;border-left:2px solid var(--line);color:var(--ink-soft)}
+.book-text pre{white-space:pre-wrap;font-size:.85em}
+.book-text table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;font-size:.9em}
+.book-text td,.book-text th{padding:.3em .5em;border:1px solid var(--line)}
+.book-text hr{border:0;border-top:1px solid var(--line);margin:2em auto;width:30%}
+.book-text .speaking,.book-text .resume-block{background:var(--mark-soft);border-radius:4px;box-shadow:0 0 0 6px var(--mark-soft)}
+::highlight(tts){background-color:var(--mark);color:inherit}
+::highlight(resume){background-color:var(--mark);color:inherit}
+.chapter-nav{max-width:34em;margin:0 auto;display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;padding-block:8px 45vh;border-top:1px solid var(--line);padding-top:20px}
+.chapter-nav button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:10px 16px;font-size:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chapter-nav .next{margin-left:auto;background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.loading{color:var(--ink-soft);font-family:var(--f-ui);font-size:15px;padding-top:30vh;text-align:center}
+
+/* Narration dock */
+.dock{flex:none;position:relative;background:var(--surface);border-top:1px solid var(--line);padding-block:8px 12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.dock-inner{max-width:520px;margin:0 auto;display:grid;gap:8px}
+.prog{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.prog span:first-child{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog .state{color:var(--accent);font-weight:600}
+.track{height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+.track i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.controls{display:grid;grid-template-columns:1fr auto auto auto 1fr;align-items:center;gap:10px}
+.chip{justify-self:start;border:1px solid var(--line);background:transparent;border-radius:999px;padding:7px 12px;font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.chip svg{width:15px;height:15px}
+.chip.on{border-color:var(--accent);color:var(--accent)}
+.chip-right{justify-self:end}
+.skip{width:46px;height:46px}
+.play{width:60px;height:60px;border:0;border-radius:999px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;box-shadow:0 4px 14px -6px var(--accent)}
+.play svg{width:26px;height:26px}
+.jump{position:absolute;left:50%;top:-48px;transform:translateX(-50%);border:0;border-radius:999px;background:var(--ink);color:var(--paper);padding:8px 14px;font-size:13px;font-weight:600;box-shadow:0 6px 18px -6px rgba(0,0,0,.4);white-space:nowrap}
+
+/* Drawers */
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:20}
+.drawer{position:fixed;top:0;bottom:0;z-index:30;width:min(360px,88vw);background:var(--surface);color:var(--ink);overflow-y:auto;box-shadow:0 0 40px rgba(0,0,0,.25);padding-top:calc(14px + env(safe-area-inset-top,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))}
+.drawer-left{left:0;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:18px}
+.drawer-right{right:0;padding-right:max(18px,env(safe-area-inset-right,0px));padding-left:18px}
+.drawer-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.drawer-head h2{margin:0;font-family:var(--f-book);font-weight:400;font-style:italic;font-size:24px}
+.toc{list-style:none;margin:0;padding:0}
+.toc button{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 8px;border-radius:8px;font-size:15px;line-height:1.3}
+.toc button:hover{background:var(--mark-soft)}
+.toc button[aria-current="true"]{color:var(--accent);font-weight:600}
+.set-group{display:grid;gap:14px;padding-block:14px;border-top:1px solid var(--line)}
+.set-group h3{margin:0;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+.field{display:grid;gap:6px;font-size:14px}
+.field>span{display:flex;justify-content:space-between}
+.field select{width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--paper)}
+.field input[type=range]{width:100%;accent-color:var(--accent)}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+.check input{margin-top:3px;accent-color:var(--accent);width:17px;height:17px}
+.seg{border:0;padding:0;margin:0;display:grid;gap:6px}
+.seg legend{font-size:14px;padding:0;margin-bottom:6px}
+.seg-opts{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg-opts label{flex:1;min-width:0;text-align:center;font-size:13px;padding:8px 4px;cursor:pointer;border-left:1px solid var(--line)}
+.seg-opts label:first-child{border-left:0}
+.seg-opts input{position:absolute;opacity:0;pointer-events:none}
+.seg-opts label:has(input:checked){background:var(--accent);color:var(--accent-ink);font-weight:600}
+.seg-opts label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:-2px}
+.text-btn{justify-self:start;border:0;background:none;color:var(--accent);font-weight:600;padding:0;font-size:14px}
+.hint{margin:0;font-size:12.5px;color:var(--ink-soft)}
+
+.toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:40;max-width:min(440px,calc(100vw - 32px));background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:10px;font-size:14px;box-shadow:0 10px 30px -10px rgba(0,0,0,.5)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head><!--pwa-->
+<body><!--pwa-->
+<div id="app">
+  <!-- Library -->
+  <section id="library" class="library" aria-label="Library">
+    <div class="shelf">
+      <header class="masthead">
+        <div>
+          <h1 class="brand">Folio</h1>
+          <p class="tagline">Read it or hear it. Your place stays put either way.</p>
+        </div>
+        <div>
+          <input type="file" id="file" accept=".epub,application/epub+zip" multiple class="visually-hidden">
+          <button class="btn" id="add-book" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Add EPUB
+          </button>
+        </div>
+      </header>
+      <div class="howto" aria-label="How your place is kept">
+        <div><b>Reading</b><p>Your place is the line at the top of the screen.</p></div>
+        <div><b>Listening</b><p>Your place is the sentence being spoken, highlighted as it goes.</p></div>
+        <div><b>Switching</b><p>Press play or pause at any time. Both pick up from the same sentence.</p></div>
+      </div>
+      <div>
+        <div class="shelf-head"><h2>Your books</h2><span id="count"></span></div>
+        <ul class="books" id="books" style="margin-top:18px"></ul>
+        <div class="empty" id="empty" hidden>
+          <p>No books yet. Add a DRM-free EPUB file, or drop one here.</p>
+          <button class="btn" type="button" data-add>Add EPUB</button>
+        </div>
+      </div>
+      <p class="foot">Books and bookmarks are kept in this browser on this device and never uploaded. Folio opens DRM-free EPUB files, such as those from Project Gutenberg, Standard Ebooks or most indie publishers.</p>
+    </div>
+  </section>
+
+  <!-- Reader -->
+  <section id="reader" class="reader" hidden aria-label="Reader">
+    <header class="topbar">
+      <button class="icon-btn" id="back" type="button" aria-label="Back to library">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <button class="icon-btn" id="open-toc" type="button" aria-label="Contents">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>
+      </button>
+      <div class="titles"><b id="r-chapter"></b><span id="r-title"></span></div>
+      <button class="icon-btn" id="open-settings" type="button" aria-label="Settings"><span class="aa">Aa</span></button>
+      <span class="icon-btn" aria-hidden="true"></span>
+    </header>
+    <main class="page" id="page">
+      <article class="book-text" id="text" lang=""></article>
+      <nav class="chapter-nav" id="chapter-nav" aria-label="Chapters">
+        <button type="button" class="prev" id="prev-ch">Previous chapter</button>
+        <button type="button" class="next" id="next-ch">Next chapter</button>
+      </nav>
+    </main>
+    <footer class="dock">
+      <button class="jump" id="jump" type="button" hidden>Back to the spoken sentence</button>
+      <div class="dock-inner">
+        <div class="prog"><span id="r-where"></span><span><span class="state" id="r-state">Reading</span> · <span id="r-pct">0%</span></span></div>
+        <div class="track" aria-hidden="true"><i id="r-fill"></i></div>
+        <div class="controls">
+          <button class="chip" id="speed" type="button" aria-label="Narration speed">1×</button>
+          <button class="icon-btn skip" id="skip-back" type="button" aria-label="Back one sentence">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l-6 6 6 6M19 6l-6 6 6 6"/></svg>
+          </button>
+          <button class="play" id="play" type="button" aria-label="Listen">
+            <svg id="ico-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6a.8.8 0 0 0 1.2.7l10.6-6.8a.8.8 0 0 0 0-1.4L9.2 4.5A.8.8 0 0 0 8 5.2z"/></svg>
+            <svg id="ico-pause" viewBox="0 0 24 24" fill="currentColor" hidden><rect x="6" y="5" width="4.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.2"/></svg>
+          </button>
+          <button class="icon-btn skip" id="skip-fwd" type="button" aria-label="Forward one sentence">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l6 6-6 6M5 6l6 6-6 6"/></svg>
+          </button>
+          <button class="chip chip-right" id="sleep" type="button" aria-label="Sleep timer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg><span id="sleep-label">Sleep</span>
+          </button>
+        </div>
+      </div>
+    </footer>
+  </section>
+
+  <div class="scrim" id="scrim" hidden></div>
+
+  <aside class="drawer drawer-left" id="toc-drawer" hidden aria-label="Contents">
+    <div class="drawer-head"><h2>Contents</h2><button class="icon-btn" type="button" data-close aria-label="Close contents">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <ol class="toc" id="toc"></ol>
+  </aside>
+
+  <aside class="drawer drawer-right" id="settings-drawer" hidden aria-label="Settings">
+    <div class="drawer-head"><h2>Settings</h2><button class="icon-btn" type="button" data-close aria-label="Close settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <section class="set-group">
+      <h3>Listening</h3>
+      <label class="field" for="set-voice"><span>Voice</span><select id="set-voice"></select></label>
+      <button class="text-btn" id="test-voice" type="button">Hear a sample</button>
+      <label class="field" for="set-rate"><span>Speed</span><select id="set-rate"></select></label>
+      <label class="check" for="set-awake"><input type="checkbox" id="set-awake"><span>Keep the screen on while listening</span></label>
+      <label class="check" for="set-follow"><input type="checkbox" id="set-follow"><span>Scroll along with the narration</span></label>
+      <p class="hint">Voices come from this device. Ones named Natural, Enhanced or Premium usually sound best. On iPhone, more voices can be downloaded in Settings › Accessibility › Spoken Content.</p>
+    </section>
+    <section class="set-group">
+      <h3>Page</h3>
+      <label class="field" for="set-size"><span>Text size <output id="size-out" for="set-size"></output></span><input type="range" id="set-size" min="14" max="30" step="1"></label>
+      <fieldset class="seg"><legend>Typeface</legend><div class="seg-opts">
+        <label><input type="radio" name="font" id="font-serif" value="serif">Serif</label>
+        <label><input type="radio" name="font" id="font-sans" value="sans">Sans</label>
+      </div></fieldset>
+      <fieldset class="seg"><legend>Colours</legend><div class="seg-opts">
+        <label><input type="radio" name="rtheme" id="rt-auto" value="auto">Auto</label>
+        <label><input type="radio" name="rtheme" id="rt-paper" value="paper">Paper</label>
+        <label><input type="radio" name="rtheme" id="rt-sepia" value="sepia">Sepia</label>
+        <label><input type="radio" name="rtheme" id="rt-night" value="night">Night</label>
+      </div></fieldset>
+    </section>
+  </aside>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* =========================================================================
+   Small helpers
+   ========================================================================= */
+const $ = (s, r = document) => r.querySelector(s);
+const now = () => performance.now();
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => r()));
+function loadLS(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
+function saveLS(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } }
+function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+let toastT = 0;
+function toast(msg, ms = 3200) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, ms);
+}
+
+/* =========================================================================
+   Settings
+   ========================================================================= */
+const RATES = [0.8, 1, 1.15, 1.3, 1.5, 1.75, 2];
+const settings = Object.assign({ rate: 1, voice: '', size: 19, font: 'serif', rtheme: 'auto', awake: true, follow: true }, loadLS('folio.settings') || {});
+const saveSettings = () => saveLS('folio.settings', settings);
+
+/* =========================================================================
+   Storage: IndexedDB with an in-memory fallback
+   ========================================================================= */
+const STORES = ['books', 'files', 'positions', 'meta'];
+const mem = Object.fromEntries(STORES.map(s => [s, new Map()]));
+let dbp = null;
+function openDB() {
+  if (dbp) return dbp;
+  dbp = new Promise(res => {
+    try {
+      const r = indexedDB.open('folio-reader', 1);
+      r.onupgradeneeded = () => { const d = r.result; for (const s of STORES) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s); };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => res(null);
+      r.onblocked = () => res(null);
+    } catch { res(null); }
+  });
+  return dbp;
+}
+async function dbGet(store, key) {
+  const d = await openDB();
+  if (!d) return mem[store].get(key);
+  return new Promise(res => {
+    try { const q = d.transaction(store).objectStore(store).get(key); q.onsuccess = () => res(q.result ?? mem[store].get(key)); q.onerror = () => res(mem[store].get(key)); }
+    catch { res(mem[store].get(key)); }
+  });
+}
+async function dbAll(store) {
+  const d = await openDB();
+  if (!d) return [...mem[store].values()];
+  return new Promise(res => {
+    try { const q = d.transaction(store).objectStore(store).getAll(); q.onsuccess = () => res(q.result); q.onerror = () => res([...mem[store].values()]); }
+    catch { res([...mem[store].values()]); }
+  });
+}
+async function dbPut(store, key, val) {
+  mem[store].set(key, val);
+  const d = await openDB(); if (!d) return;
+  return new Promise(res => {
+    try { const tx = d.transaction(store, 'readwrite'); tx.objectStore(store).put(val, key); tx.oncomplete = () => res(); tx.onerror = () => res(); tx.onabort = () => res(); }
+    catch { res(); }
+  });
+}
+async function dbDel(store, key) {
+  mem[store].delete(key);
+  const d = await openDB(); if (!d) return;
+  return new Promise(res => {
+    try { const tx = d.transaction(store, 'readwrite'); tx.objectStore(store).delete(key); tx.oncomplete = () => res(); tx.onerror = () => res(); }
+    catch { res(); }
+  });
+}
+/* Bookmarks are also mirrored to localStorage; whichever copy is newer wins. */
+async function getPosition(id) {
+  const a = await dbGet('positions', id);
+  const b = loadLS('folio.pos.' + id);
+  if (a && b) return (b.at || 0) > (a.at || 0) ? b : a;
+  return a || b || null;
+}
+function putPosition(id, rec) { saveLS('folio.pos.' + id, rec); return dbPut('positions', id, rec); }
+
+/* =========================================================================
+   ZIP reader (EPUB files are ZIP archives). Uses the browser's own inflate.
+   ========================================================================= */
+async function inflateRaw(u8) {
+  if (typeof DecompressionStream === 'undefined') throw new Error('This browser is too old to open EPUB files. Please update it.');
+  const stream = new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+async function openZip(blob) {
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('This file is not a valid EPUB.');
+  const count = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const entries = new Map(), utf8 = new TextDecoder();
+  for (let n = 0; n < count; n++) {
+    if (p + 46 > buf.length || dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+    const nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+    const off = dv.getUint32(p + 42, true);
+    entries.set(utf8.decode(buf.subarray(p + 46, p + 46 + nl)), { method, csize, off });
+    p += 46 + nl + xl + cl;
+  }
+  const lower = new Map([...entries.keys()].map(k => [k.toLowerCase(), k]));
+  const find = name => entries.get(name) || entries.get(lower.get(String(name).toLowerCase()));
+  async function bytes(name) {
+    const e = find(name); if (!e) return null;
+    const h = e.off;
+    if (dv.getUint32(h, true) !== 0x04034b50) return null;
+    const start = h + 30 + dv.getUint16(h + 26, true) + dv.getUint16(h + 28, true);
+    const raw = buf.subarray(start, start + e.csize);
+    if (e.method === 0) return raw;
+    if (e.method === 8) return inflateRaw(raw);
+    throw new Error('This EPUB uses an unsupported compression method.');
+  }
+  return {
+    has: n => !!find(n),
+    bytes,
+    async text(n) { const b = await bytes(n); return b ? new TextDecoder().decode(b) : null; }
+  };
+}
+
+/* =========================================================================
+   EPUB package parsing
+   ========================================================================= */
+const parseXML = s => new DOMParser().parseFromString(s, 'application/xml');
+const byLocal = (node, name) => [...node.getElementsByTagNameNS('*', name)];
+function parseDoc(text) {
+  let d = new DOMParser().parseFromString(text, 'application/xhtml+xml');
+  if (d.getElementsByTagName('parsererror').length) d = new DOMParser().parseFromString(text, 'text/html');
+  return d;
+}
+function bodyOf(d) { return d.body || byLocal(d, 'body')[0] || d.documentElement; }
+function resolvePath(base, rel) {
+  try {
+    const u = new URL(rel, 'http://z/' + base.split('/').map(encodeURIComponent).join('/'));
+    return { path: decodeURIComponent(u.pathname.slice(1)), hash: decodeURIComponent(u.hash.slice(1)) };
+  } catch { return { path: rel, hash: '' }; }
+}
+
+async function loadPackage(zip) {
+  const containerXml = await zip.text('META-INF/container.xml');
+  if (!containerXml) throw new Error('This file does not look like an EPUB book.');
+  const enc = await zip.text('META-INF/encryption.xml');
+  if (enc) {
+    const algs = byLocal(parseXML(enc), 'EncryptionMethod').map(m => m.getAttribute('Algorithm') || '');
+    const fontOnly = /idpf\.org\/2008\/embedding|ns\.adobe\.com\/pdf\/enc#RC/;
+    if (algs.some(a => !fontOnly.test(a))) throw new Error('This book is DRM-protected, so it can only be opened in the app of the store that sold it. Folio opens DRM-free EPUBs.');
+  }
+  const opfPath = byLocal(parseXML(containerXml), 'rootfile')[0]?.getAttribute('full-path');
+  const opfText = opfPath && await zip.text(opfPath);
+  if (!opfText) throw new Error('This EPUB is missing its table of contents file.');
+  const opf = parseXML(opfText);
+  const first = n => byLocal(opf, n)[0]?.textContent.replace(/\s+/g, ' ').trim() || '';
+  const title = first('title') || 'Untitled';
+  const author = byLocal(opf, 'creator').map(e => e.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean).join(', ');
+  const lang = first('language');
+  const manifest = new Map();
+  for (const it of byLocal(opf, 'item')) {
+    const href = it.getAttribute('href'); if (!href) continue;
+    manifest.set(it.getAttribute('id'), {
+      id: it.getAttribute('id'),
+      path: resolvePath(opfPath, href).path,
+      type: it.getAttribute('media-type') || '',
+      props: (it.getAttribute('properties') || '').split(/\s+/)
+    });
+  }
+  const spine = byLocal(opf, 'itemref').map(r => manifest.get(r.getAttribute('idref'))).filter(it => it && /html/.test(it.type));
+  const items = [...manifest.values()];
+  let cover = items.find(m => m.props.includes('cover-image'));
+  if (!cover) { const mc = byLocal(opf, 'meta').find(m => m.getAttribute('name') === 'cover'); if (mc) cover = manifest.get(mc.getAttribute('content')); }
+  if (!cover) cover = items.find(m => /^image\//.test(m.type) && /cover/i.test(m.id + ' ' + m.path));
+  if (cover && !/^image\//.test(cover.type)) cover = null;
+  const types = new Map(items.map(m => [m.path, m.type]));
+  const toc = await loadToc(zip, opf, manifest, spine);
+  return { title, author, lang, spine, cover, types, toc };
+}
+
+async function loadToc(zip, opf, manifest, spine) {
+  const spineIndex = new Map(spine.map((s, i) => [s.path, i]));
+  const out = [];
+  const nav = [...manifest.values()].find(m => m.props.includes('nav'));
+  if (nav) {
+    const t = await zip.text(nav.path);
+    if (t) {
+      const d = parseDoc(t);
+      const navs = byLocal(d, 'nav');
+      const el = navs.find(n => /toc/.test(n.getAttribute('epub:type') || n.getAttributeNS('http://www.idpf.org/2007/ops', 'type') || '')) || navs[0];
+      if (el) for (const a of byLocal(el, 'a')) {
+        const href = a.getAttribute('href'); if (!href) continue;
+        const { path, hash } = resolvePath(nav.path, href);
+        const ch = spineIndex.get(path); if (ch == null) continue;
+        let depth = 0; for (let p = a.parentElement; p && p !== el; p = p.parentElement) if (p.localName === 'ol' || p.localName === 'ul') depth++;
+        const label = a.textContent.replace(/\s+/g, ' ').trim(); if (!label) continue;
+        out.push({ label, ch, anchor: hash, depth: Math.max(0, depth - 1) });
+      }
+    }
+  }
+  if (!out.length) {
+    const tocId = byLocal(opf, 'spine')[0]?.getAttribute('toc');
+    const ncx = manifest.get(tocId) || [...manifest.values()].find(m => m.type === 'application/x-dtbncx+xml');
+    const t = ncx && await zip.text(ncx.path);
+    if (t) for (const np of byLocal(parseXML(t), 'navPoint')) {
+      const label = byLocal(np, 'text')[0]?.textContent.replace(/\s+/g, ' ').trim();
+      const src = byLocal(np, 'content')[0]?.getAttribute('src');
+      if (!label || !src) continue;
+      const { path, hash } = resolvePath(ncx.path, src);
+      const ch = spineIndex.get(path); if (ch == null) continue;
+      let depth = 0; for (let p = np.parentElement; p; p = p.parentElement) if (p.localName === 'navPoint') depth++;
+      out.push({ label, ch, anchor: hash, depth });
+    }
+  }
+  return out;
+}
+
+function textLength(root) { return (root?.textContent || '').replace(/\s+/g, ' ').trim().length; }
+
+/* =========================================================================
+   Built-in guide (a small sample book so there is something to try)
+   ========================================================================= */
+const GUIDE = {
+  id: 'guide', title: 'How Folio Works', author: 'A short guide to try first', lang: 'en', source: 'guide',
+  chapters: [
+    { title: 'One bookmark', html: `<h1>One bookmark</h1>
+<p>Folio keeps one bookmark for each book, and reading and listening share it. Whatever you did last decides where you pick up next.</p>
+<p>When you read, your place is the line at the top of the screen. Scroll down and the bookmark follows you.</p>
+<p>When you listen, your place is the sentence being spoken. It is highlighted so you can find it at a glance.</p>
+<p>Switch whenever you like. Press play while reading and Folio starts speaking from the top of the screen. Press pause and the sentence you were hearing moves to the top of the screen, so you can carry on with your eyes.</p>
+<p>Try it now. Press the play button below, listen for a sentence or two, then pause.</p>` },
+    { title: 'Listening', html: `<h1>Listening</h1>
+<p>The play button starts and stops the narration. The arrows on either side step back or forward one sentence at a time.</p>
+<p>While Folio is speaking, tap any sentence and it will jump straight there.</p>
+<p>The speed button cycles from a little slower than normal up to twice as fast. The moon button sets a sleep timer of fifteen, thirty or sixty minutes, or stops at the end of the chapter. Either way, your place is saved.</p>
+<p>The voice comes from your phone or computer. Settings, behind the Aa button, lists every voice your device offers.</p>
+<p>Many phones stop a web page from speaking when the screen locks, so Folio asks the screen to stay on while it reads. You can turn that off in Settings.</p>` },
+    { title: 'Reading', html: `<h1>Reading</h1>
+<p>Scroll to read. The contents button at the top lists the chapters, and the end of each chapter has a button for the next one.</p>
+<p>Settings let you change the text size, the typeface and the page colours. Paper, sepia and night are there for different kinds of light.</p>
+<p>If narration is playing and you scroll away to look at something, a button appears that brings you back to the sentence being read.</p>` },
+    { title: 'Good to know', html: `<h1>Good to know</h1>
+<p>Folio opens EPUB files without DRM. Books bought from the large stores are usually locked to their own apps. Books from Project Gutenberg, Standard Ebooks, Humble Bundle, many indie publishers and your own files work well.</p>
+<p>Your books and bookmarks are stored in this browser on this device. They are not uploaded anywhere.</p>
+<p>If you remove a book and add the same file again later, Folio remembers where you were.</p>
+<p>That is everything. Go back to the library with the arrow at the top left and add a book of your own.</p>` }
+  ]
+};
+function guideRecord() {
+  const chapters = GUIDE.chapters.map(c => ({ len: textLength(new DOMParser().parseFromString(c.html, 'text/html').body) }));
+  return { id: GUIDE.id, title: GUIDE.title, author: GUIDE.author, lang: GUIDE.lang, source: 'guide', chapters, total: chapters.reduce((a, c) => a + c.len, 0), addedAt: 0 };
+}
+
+/* =========================================================================
+   Importing books
+   ========================================================================= */
+async function importFile(file) {
+  const zip = await openZip(file);
+  const pkg = await loadPackage(zip);
+  if (!pkg.spine.length) throw new Error('This EPUB has no readable chapters.');
+  const chapters = [];
+  for (const item of pkg.spine) {
+    const t = await zip.text(item.path);
+    chapters.push({ len: t ? textLength(bodyOf(parseDoc(t))) : 0 });
+  }
+  let coverBlob = null;
+  if (pkg.cover) { const b = await zip.bytes(pkg.cover.path); if (b) coverBlob = new Blob([b], { type: pkg.cover.type }); }
+  // Same book file → same id, so removing and re-adding keeps the bookmark.
+  const id = 'e' + hashStr(pkg.title + '|' + pkg.author + '|' + file.size);
+  await dbPut('files', id, file);
+  await dbPut('books', id, {
+    id, title: pkg.title, author: pkg.author, lang: pkg.lang, source: 'epub', coverBlob,
+    chapters, total: chapters.reduce((a, c) => a + c.len, 0), addedAt: Date.now(), fileName: file.name
+  });
+  try { navigator.storage?.persist?.(); } catch { /* optional */ }
+  return id;
+}
+
+async function addFiles(files) {
+  const list = [...files].filter(f => /\.epub$/i.test(f.name) || f.type === 'application/epub+zip');
+  if (!list.length) { toast('Choose a file ending in .epub.'); return; }
+  let lastId = null, added = 0;
+  for (const f of list) {
+    toast('Adding “' + f.name + '”…', 60000);
+    try { lastId = await importFile(f); added++; }
+    catch (e) { console.error(e); toast((e && e.message) || 'That file could not be opened.', 7000); }
+  }
+  await renderLibrary();
+  if (added) toast(added === 1 ? 'Added to your books.' : added + ' books added.');
+  if (added === 1 && list.length === 1 && lastId) openBook(lastId);
+}
+
+/* =========================================================================
+   Library view
+   ========================================================================= */
+const COVER_HUES = ['#2F4A7A', '#6B3F5E', '#2E5E55', '#7A4B2A', '#4B4F7A', '#5A2E2E', '#3A5A2E'];
+let coverUrls = [];
+const rel = (() => { try { return new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }); } catch { return null; } })();
+function ago(ts) {
+  if (!ts || !rel) return '';
+  const s = (ts - Date.now()) / 1000;
+  const units = [['year', 31536000], ['month', 2592000], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60]];
+  for (const [u, n] of units) if (Math.abs(s) >= n) return rel.format(Math.round(s / n), u);
+  return 'just now';
+}
+
+async function ensureGuide() {
+  const seeded = loadLS('folio.seeded') || (await dbGet('meta', 'seeded'));
+  if (seeded) return;
+  await dbPut('books', GUIDE.id, guideRecord());
+  await dbPut('meta', 'seeded', true); saveLS('folio.seeded', true);
+}
+
+async function renderLibrary() {
+  for (const u of coverUrls) URL.revokeObjectURL(u); coverUrls = [];
+  const books = await dbAll('books');
+  const positions = new Map();
+  for (const b of books) positions.set(b.id, await getPosition(b.id));
+  books.sort((a, b) => ((positions.get(b.id)?.at || b.addedAt || 0) - (positions.get(a.id)?.at || a.addedAt || 0)));
+  const ul = $('#books'); ul.replaceChildren();
+  $('#empty').hidden = books.length > 0;
+  $('#count').textContent = books.length ? books.length + (books.length === 1 ? ' book' : ' books') : '';
+  for (const b of books) {
+    const p = positions.get(b.id);
+    const pct = Math.round((p?.pct || 0) * 100);
+    const li = document.createElement('li'); li.className = 'book';
+    let cover;
+    if (b.coverBlob) { const u = URL.createObjectURL(b.coverBlob); coverUrls.push(u); cover = `<img src="${u}" alt="">`; }
+    else {
+      const hue = COVER_HUES[parseInt(hashStr(b.title), 36) % COVER_HUES.length];
+      cover = `<div class="cover-gen" style="background:${hue}"><span class="ct">${esc(b.title)}</span><span class="ca">${esc((b.author || '').split(',')[0])}</span></div>`;
+    }
+    const status = p?.at ? `<span class="mode">${p.mode === 'listen' ? 'Listened' : 'Read'}</span> ${esc(ago(p.at))}` : 'Not started';
+    li.innerHTML = `
+      <button class="book-open" type="button" data-id="${esc(b.id)}" aria-label="Open ${esc(b.title)}">
+        <div class="cover">${cover}</div>
+        <span class="book-title">${esc(b.title)}</span>
+        <span class="book-author">${esc(b.author || '')}</span>
+        <span class="book-track"><i style="width:${pct}%"></i></span>
+        <span class="book-meta">${pct}% · ${status}</span>
+      </button>
+      <button class="book-remove" type="button" data-remove="${esc(b.id)}" aria-label="Remove ${esc(b.title)}">Remove</button>`;
+    ul.appendChild(li);
+  }
+}
+
+$('#books').addEventListener('click', async e => {
+  const rm = e.target.closest('[data-remove]');
+  if (rm) {
+    if (!rm.classList.contains('confirm')) {
+      rm.classList.add('confirm'); rm.textContent = 'Tap again to remove';
+      setTimeout(() => { if (rm.isConnected) { rm.classList.remove('confirm'); rm.textContent = 'Remove'; } }, 3500);
+      return;
+    }
+    const id = rm.dataset.remove;
+    await dbDel('books', id); await dbDel('files', id);
+    // The bookmark is kept on purpose: adding the same file again restores it.
+    await renderLibrary(); toast('Removed. Add the same file again to pick up where you left off.');
+    return;
+  }
+  const open = e.target.closest('[data-id]');
+  if (open) openBook(open.dataset.id);
+});
+const fileInput = $('#file');
+for (const b of document.querySelectorAll('#add-book,[data-add]')) b.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => { if (fileInput.files.length) addFiles(fileInput.files); fileInput.value = ''; });
+const lib = $('#library');
+lib.addEventListener('dragover', e => { e.preventDefault(); lib.classList.add('dropping'); });
+lib.addEventListener('dragleave', e => { if (e.target === lib) lib.classList.remove('dropping'); });
+lib.addEventListener('drop', e => { e.preventDefault(); lib.classList.remove('dropping'); if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files); });
+
+/* =========================================================================
+   Reader state
+   ========================================================================= */
+const page = $('#page'), text = $('#text');
+const R = {
+  book: null,          // runtime book: { id, title, lang, chapters, toc, load(i), urls }
+  ch: 0,
+  blocks: [], blockIndex: new Map(), starts: [], textLen: 0,
+  sents: new Map(),
+  pos: { ch: 0, b: 0, c: 0 },
+  playing: false, token: 0, cur: null, utter: null, errs: 0,
+  lastUser: 0, progUntil: 0, renderedAt: 0,
+  sleep: { mode: 'off', until: 0 },
+  marked: null
+};
+
+const BLOCK_SEL = 'p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,dt,dd,figcaption,td,th,caption,div,section,article,aside,header,footer,main,nav,figure,ul,ol,dl,table,thead,tbody,tfoot,tr,hr,address,details,summary';
+const STRIP_SEL = 'script,style,link,meta,iframe,object,embed,form,input,button,textarea,select,audio,video,noscript,template,title,head';
+
+async function buildRuntimeBook(id) {
+  const meta = await dbGet('books', id);
+  if (!meta) throw new Error('That book could not be found.');
+  if (meta.source === 'guide') {
+    return {
+      id, title: meta.title, lang: 'en', chapters: meta.chapters, total: meta.total, urls: new Map(),
+      toc: GUIDE.chapters.map((c, i) => ({ label: c.title, ch: i, anchor: '', depth: 0 })),
+      async load(i) { return { root: new DOMParser().parseFromString(GUIDE.chapters[i].html, 'text/html').body, path: 'guide/' + i }; },
+      types: new Map(), zip: null, spine: GUIDE.chapters.map((c, i) => ({ path: 'guide/' + i }))
+    };
+  }
+  const file = await dbGet('files', id);
+  if (!file) throw new Error('This book’s file is missing. Please add it again.');
+  const zip = await openZip(file);
+  const pkg = await loadPackage(zip);
+  return {
+    id, title: meta.title, lang: meta.lang || pkg.lang, chapters: meta.chapters, total: meta.total, urls: new Map(),
+    toc: pkg.toc, types: pkg.types, zip, spine: pkg.spine,
+    async load(i) { const item = pkg.spine[i]; const t = await zip.text(item.path); return { root: bodyOf(parseDoc(t || '')), path: item.path }; }
+  };
+}
+
+async function resourceUrl(book, path) {
+  if (book.urls.has(path)) return book.urls.get(path);
+  const b = book.zip && await book.zip.bytes(path);
+  if (!b) return '';
+  const u = URL.createObjectURL(new Blob([b], { type: book.types.get(path) || '' }));
+  book.urls.set(path, u); return u;
+}
+
+async function prepareChapter(book, i) {
+  const { root, path } = await book.load(i);
+  const wrap = document.createElement('div');
+  for (const n of [...(root?.childNodes || [])]) wrap.appendChild(document.importNode(n, true));
+  // Strip anything active or styled by the book; Folio supplies its own typography.
+  for (const el of wrap.querySelectorAll(STRIP_SEL)) el.remove();
+  const tw = document.createTreeWalker(wrap, NodeFilter.SHOW_COMMENT); const comments = [];
+  while (tw.nextNode()) comments.push(tw.currentNode); comments.forEach(c => c.remove());
+  const spineIndex = new Map(book.spine.map((s, k) => [s.path, k]));
+  for (const el of wrap.querySelectorAll('*')) {
+    for (const a of [...el.attributes]) {
+      const n = a.name.toLowerCase();
+      if (n.startsWith('on') || n === 'style' || n === 'class' || (el.localName === 'img' && (n === 'width' || n === 'height'))) el.removeAttribute(a.name);
+    }
+    if (el.id) el.id = 'bk-' + el.id;
+    if (el.getAttribute('name') && el.localName === 'a') el.id = el.id || 'bk-' + el.getAttribute('name');
+  }
+  for (const img of wrap.querySelectorAll('img[src]')) {
+    const { path: p } = resolvePath(path, img.getAttribute('src'));
+    img.src = await resourceUrl(book, p); img.loading = 'eager'; img.decoding = 'async';
+  }
+  for (const im of wrap.querySelectorAll('image')) {
+    const h = im.getAttribute('href') || im.getAttributeNS('http://www.w3.org/1999/xlink', 'href');
+    if (!h) continue;
+    const u = await resourceUrl(book, resolvePath(path, h).path);
+    im.setAttribute('href', u); im.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', u);
+  }
+  for (const a of wrap.querySelectorAll('a[href]')) {
+    const href = a.getAttribute('href');
+    if (/^javascript:/i.test(href)) { a.removeAttribute('href'); continue; }
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href)) { a.target = '_blank'; a.rel = 'noopener noreferrer'; continue; }
+    const r = href.startsWith('#') ? { path, hash: decodeURIComponent(href.slice(1)) } : resolvePath(path, href);
+    const ch = spineIndex.get(r.path);
+    a.setAttribute('href', '#');
+    if (ch != null) { a.dataset.ch = ch; a.dataset.anchor = r.hash; }
+  }
+  return wrap;
+}
+
+/* Group every run of text into "blocks" (paragraph-like units). A bookmark is
+   { ch: chapter, b: block, c: character offset within that block's text }. */
+function isBlockish(n) { return n.nodeType === 1 && (n.matches(BLOCK_SEL) || !!n.querySelector(BLOCK_SEL)); }
+function normalize(container) {
+  let run = [];
+  const flush = () => {
+    if (run.some(n => /\S/.test(n.textContent || ''))) {
+      const w = document.createElement('div'); w.className = 'fl-run';
+      run[0].parentNode.insertBefore(w, run[0]); for (const n of run) w.appendChild(n);
+    }
+    run = [];
+  };
+  for (const child of [...container.childNodes]) {
+    if (isBlockish(child)) { flush(); if (child.querySelector(BLOCK_SEL)) normalize(child); }
+    else run.push(child);
+  }
+  flush();
+}
+function collectBlocks(root) {
+  normalize(root);
+  return [...root.querySelectorAll(BLOCK_SEL)].filter(e => !e.querySelector(BLOCK_SEL) && /\S/.test(e.textContent));
+}
+
+function chapterLabel(ch) {
+  const toc = R.book?.toc || [];
+  const own = toc.find(t => t.ch === ch);
+  if (own) return own.label;
+  let prev = null; for (const t of toc) if (t.ch < ch && (!prev || t.ch >= prev.ch)) prev = t;
+  return prev ? prev.label : 'Section ' + (ch + 1);
+}
+
+async function renderChapter(i) {
+  R.ch = i; R.sents.clear(); clearMarks();
+  const content = await prepareChapter(R.book, i);
+  text.replaceChildren(...content.childNodes);
+  R.blocks = collectBlocks(text);
+  R.blockIndex = new Map(R.blocks.map((b, k) => [b, k]));
+  R.starts = []; let acc = 0;
+  for (const b of R.blocks) { R.starts.push(acc); acc += b.textContent.length; }
+  R.textLen = acc;
+  R.renderedAt = now();
+  const n = R.book.chapters.length;
+  $('#prev-ch').hidden = i === 0;
+  $('#next-ch').hidden = i >= n - 1;
+  if (i < n - 1) $('#next-ch').textContent = 'Next: ' + chapterLabel(i + 1);
+  $('#r-chapter').textContent = chapterLabel(i);
+  updateTocCurrent();
+}
+
+/* After images and fonts load the layout shifts, so re-apply the bookmark
+   unless the reader has already started scrolling. */
+function settle() {
+  const t0 = R.renderedAt;
+  const again = () => { if (R.renderedAt === t0 && !R.playing && R.lastUser < t0) scrollToPos(R.pos); };
+  for (const img of text.querySelectorAll('img')) if (!img.complete) img.addEventListener('load', again, { once: true });
+  document.fonts?.ready?.then(again);
+}
+
+/* =========================================================================
+   Bookmark <-> screen
+   ========================================================================= */
+function caretAt(x, y) {
+  if (document.caretPositionFromPoint) { const p = document.caretPositionFromPoint(x, y); if (p) return { node: p.offsetNode, offset: p.offset }; }
+  if (document.caretRangeFromPoint) { const r = document.caretRangeFromPoint(x, y); if (r) return { node: r.startContainer, offset: r.startOffset }; }
+  return null;
+}
+function offsetIn(block, node, off) {
+  try { const r = document.createRange(); r.setStart(block, 0); r.setEnd(node, off); return r.toString().length; } catch { return 0; }
+}
+function domPoint(block, c) {
+  const tw = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+  let acc = 0, last = null;
+  while (tw.nextNode()) {
+    const n = tw.currentNode, len = n.data.length;
+    if (c <= acc + len) return { node: n, offset: c - acc };
+    acc += len; last = n;
+  }
+  return last ? { node: last, offset: last.data.length } : null;
+}
+function rangeFor(block, start, end) {
+  const a = domPoint(block, start), b = domPoint(block, end);
+  if (!a || !b) return null;
+  try { const r = document.createRange(); r.setStart(a.node, a.offset); r.setEnd(b.node, b.offset); return r; } catch { return null; }
+}
+function topOf(block, c) {
+  if (c > 0) {
+    const pt = domPoint(block, c);
+    if (pt) {
+      try {
+        const r = document.createRange(); r.setStart(pt.node, pt.offset); r.setEnd(pt.node, Math.min(pt.node.data.length, pt.offset + 1));
+        const rects = r.getClientRects(); if (rects.length) return rects[0].top;
+      } catch { /* fall through */ }
+    }
+  }
+  return block.getBoundingClientRect().top;
+}
+const TOP_PAD = 10;
+function programmatic(ms) { R.progUntil = now() + ms; R.progStart = now(); }
+function scrollToPos(pos, smooth = false) {
+  const blk = R.blocks[pos.b];
+  if (!blk) { programmatic(150); page.scrollTop = 0; return; }
+  const delta = topOf(blk, pos.c) - page.getBoundingClientRect().top - TOP_PAD;
+  if (smooth && !reduceMotion()) { programmatic(900); page.scrollBy({ top: delta, behavior: 'smooth' }); }
+  else { programmatic(150); page.scrollTop += delta; }
+}
+function posFromScroll() {
+  const blocks = R.blocks;
+  if (!blocks.length) return { ch: R.ch, b: 0, c: 0 };
+  const pr = page.getBoundingClientRect(), topY = pr.top + TOP_PAD;
+  let lo = 0, hi = blocks.length - 1, ans = blocks.length - 1;
+  while (lo <= hi) { const mid = (lo + hi) >> 1; if (blocks[mid].getBoundingClientRect().bottom > topY + 2) { ans = mid; hi = mid - 1; } else lo = mid + 1; }
+  const blk = blocks[ans], r = blk.getBoundingClientRect();
+  let c = 0;
+  if (r.top < topY - 4) {
+    const lh = parseFloat(getComputedStyle(blk).lineHeight) || 24;
+    const hit = caretAt(Math.max(r.left + 2, pr.left + 2), topY + lh * 0.55);
+    if (hit && blk.contains(hit.node)) c = offsetIn(blk, hit.node, hit.offset);
+  }
+  return { ch: R.ch, b: ans, c };
+}
+
+function pctOf(pos) {
+  const chs = R.book.chapters, total = R.book.total || 1;
+  let before = 0; for (let k = 0; k < pos.ch; k++) before += chs[k]?.len || 0;
+  const within = R.textLen ? ((R.starts[pos.b] || 0) + pos.c) / R.textLen : 0;
+  return Math.min(1, Math.max(0, (before + within * (chs[pos.ch]?.len || 0)) / total));
+}
+
+let saveT = 0;
+function setPos(p, mode) {
+  R.pos = { ch: p.ch, b: p.b, c: p.c, mode, at: Date.now() };
+  updateProgressUI();
+  clearTimeout(saveT); saveT = setTimeout(flushSave, 600);
+}
+function flushSave() {
+  clearTimeout(saveT);
+  if (!R.book) return;
+  putPosition(R.book.id, { ...R.pos, id: R.book.id, pct: pctOf(R.pos) });
+}
+function updateProgressUI() {
+  if (!R.book) return;
+  const pct = pctOf(R.pos);
+  $('#r-pct').textContent = Math.round(pct * 100) + '%';
+  $('#r-fill').style.width = (pct * 100).toFixed(1) + '%';
+  $('#r-where').textContent = 'Chapter ' + (R.ch + 1) + ' of ' + R.book.chapters.length;
+  $('#r-state').textContent = R.playing ? 'Listening' : 'Reading';
+}
+
+/* Reading: whatever line is at the top of the screen is the bookmark. */
+let scrollRaf = 0, scrollT = 0;
+page.addEventListener('scroll', () => {
+  if (scrollRaf) return;
+  scrollRaf = requestAnimationFrame(() => { scrollRaf = 0; onScroll(); });
+}, { passive: true });
+for (const ev of ['wheel', 'touchstart', 'touchmove', 'pointerdown', 'keydown']) page.addEventListener(ev, () => { R.lastUser = now(); }, { passive: true });
+function onScroll() {
+  updateJump();
+  if (R.playing) return;
+  const userDriven = R.lastUser > (R.progStart || 0);
+  if (now() < R.progUntil && !userDriven) return;
+  clearTimeout(scrollT);
+  scrollT = setTimeout(() => {
+    if (R.playing || !R.book) return;
+    if (now() < R.progUntil && !(R.lastUser > (R.progStart || 0))) return;
+    if (R.marked && R.lastUser > R.renderedAt) clearMarks();
+    setPos(posFromScroll(), 'read');
+  }, 200);
+}
+
+/* =========================================================================
+   Sentences
+   ========================================================================= */
+const MAX_CHUNK = 220;
+function segments(t) {
+  const out = [];
+  let seg = null;
+  if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+    try { seg = new Intl.Segmenter(R.book?.lang || undefined, { granularity: 'sentence' }); }
+    catch { try { seg = new Intl.Segmenter(undefined, { granularity: 'sentence' }); } catch { seg = null; } }
+  }
+  if (seg) { for (const s of seg.segment(t)) out.push([s.index, s.index + s.segment.length]); }
+  else {
+    const re = /[^.!?…]*[.!?…]+["'”’»)\]]*\s*|[^.!?…]+$/g; let m;
+    while ((m = re.exec(t)) && m[0]) out.push([m.index, m.index + m[0].length]);
+  }
+  return out;
+}
+function sentencesOf(b) {
+  if (R.sents.has(b)) return R.sents.get(b);
+  const t = R.blocks[b]?.textContent || '';
+  const out = [];
+  const push = (s, e) => {
+    const raw = t.slice(s, e);
+    const lead = raw.length - raw.trimStart().length, trail = raw.length - raw.trimEnd().length;
+    const spoken = raw.replace(/\s+/g, ' ').trim();
+    if (/[\p{L}\p{N}]/u.test(spoken)) out.push({ start: s, end: e, hs: s + lead, he: e - trail, text: spoken });
+  };
+  for (let [s, e] of segments(t)) {
+    // Long sentences are split so speech engines do not cut them off.
+    while (e - s > MAX_CHUNK) {
+      const slice = t.slice(s, s + MAX_CHUNK);
+      let cut = Math.max(slice.lastIndexOf(', '), slice.lastIndexOf('; '), slice.lastIndexOf(': '), slice.lastIndexOf(' —'), slice.lastIndexOf('— '));
+      if (cut < MAX_CHUNK * 0.4) cut = slice.lastIndexOf(' ');
+      cut = cut <= 0 ? MAX_CHUNK : cut + 1;
+      push(s, s + cut); s += cut;
+    }
+    push(s, e);
+  }
+  R.sents.set(b, out);
+  return out;
+}
+function sentenceAt(b, c) {
+  const ss = sentencesOf(b); let i = 0;
+  for (let k = 0; k < ss.length; k++) if (ss[k].start <= c) i = k; else break;
+  return i;
+}
+
+/* =========================================================================
+   Highlighting
+   ========================================================================= */
+const HL = typeof CSS !== 'undefined' && CSS.highlights && typeof Highlight !== 'undefined';
+function clearMarks() {
+  if (HL) { CSS.highlights.delete('tts'); CSS.highlights.delete('resume'); }
+  if (R.marked) R.marked.classList.remove('speaking', 'resume-block');
+  R.marked = null;
+}
+function mark(b, s, kind) {
+  clearMarks();
+  const blk = R.blocks[b]; if (!blk) return;
+  if (HL) { const rg = rangeFor(blk, s.hs, s.he); if (rg) CSS.highlights.set(kind, new Highlight(rg)); }
+  else blk.classList.add(kind === 'tts' ? 'speaking' : 'resume-block');
+  R.marked = blk;
+}
+function sentenceRect(b, s) {
+  const blk = R.blocks[b]; if (!blk) return null;
+  const rg = rangeFor(blk, s.hs, s.he);
+  const rects = rg ? rg.getClientRects() : null;
+  if (rects && rects.length) return { top: rects[0].top, bottom: rects[rects.length - 1].bottom };
+  return blk.getBoundingClientRect();
+}
+function follow(b, s) {
+  if (!settings.follow) return;
+  if (now() - R.lastUser < 6000) { updateJump(); return; }
+  const r = sentenceRect(b, s); if (!r) return;
+  const pr = page.getBoundingClientRect();
+  if (r.top < pr.top + pr.height * 0.06 || r.bottom > pr.bottom - pr.height * 0.28) {
+    const delta = r.top - pr.top - pr.height * 0.2;
+    programmatic(reduceMotion() ? 150 : 900);
+    page.scrollBy({ top: delta, behavior: reduceMotion() ? 'auto' : 'smooth' });
+  }
+}
+function updateJump() {
+  const j = $('#jump');
+  if (!R.playing || !R.cur) { j.hidden = true; return; }
+  const s = sentencesOf(R.cur.b)[R.cur.i]; const r = s && sentenceRect(R.cur.b, s);
+  const pr = page.getBoundingClientRect();
+  j.hidden = !r || (r.bottom > pr.top && r.top < pr.bottom);
+}
+$('#jump').addEventListener('click', () => {
+  R.lastUser = 0;
+  const s = R.cur && sentencesOf(R.cur.b)[R.cur.i];
+  if (s) follow(R.cur.b, s);
+  setTimeout(updateJump, 950);
+});
+
+/* =========================================================================
+   Speech
+   ========================================================================= */
+const synth = typeof speechSynthesis !== 'undefined' ? speechSynthesis : null;
+let voices = [];
+function loadVoices() { if (!synth) return; voices = synth.getVoices(); fillVoices(); }
+if (synth) { loadVoices(); synth.addEventListener?.('voiceschanged', loadVoices); }
+function voiceScore(v) { return (/natural|neural|premium|enhanced|siri|google/i.test(v.name) ? 2 : 0) + (v.localService ? 0.5 : 0) + (v.default ? 0.25 : 0); }
+function currentVoice() {
+  if (!voices.length) return null;
+  if (settings.voice) { const v = voices.find(v => v.voiceURI === settings.voice); if (v) return v; }
+  const lang = (R.book?.lang || navigator.language || 'en').toLowerCase().slice(0, 2);
+  const m = voices.filter(v => (v.lang || '').toLowerCase().startsWith(lang));
+  return m.sort((a, b) => voiceScore(b) - voiceScore(a))[0] || voices.find(v => v.default) || voices[0];
+}
+
+let wake = null;
+async function acquireWake() {
+  if (!settings.awake || !navigator.wakeLock || wake) return;
+  try { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } catch { wake = null; }
+}
+function releaseWake() { try { wake?.release(); } catch { /* ignore */ } wake = null; }
+
+function speakAt(b, i) {
+  const my = ++R.token;
+  if (synth.speaking || synth.pending) { synth.cancel(); setTimeout(() => step(b, i, my), 80); }
+  else step(b, i, my); // run synchronously so the first utterance stays inside the tap (needed on iOS)
+}
+
+async function step(b, i, my) {
+  if (my !== R.token || !R.playing) return;
+  if (b >= R.blocks.length) {
+    if (R.ch + 1 < R.book.chapters.length) {
+      if (R.sleep.mode === 'chapter') { stopForSleep(); return; }
+      await renderChapter(R.ch + 1);
+      if (my !== R.token) return;
+      programmatic(150); page.scrollTop = 0;
+      setPos({ ch: R.ch, b: 0, c: 0 }, 'listen');
+      return step(0, 0, my);
+    }
+    pause(); toast('That’s the end of the book.');
+    return;
+  }
+  const ss = sentencesOf(b);
+  if (i >= ss.length) return step(b + 1, 0, my);
+  const s = ss[i];
+  R.cur = { b, i };
+  setPos({ ch: R.ch, b, c: s.start }, 'listen');
+  mark(b, s, 'tts');
+  follow(b, s);
+  updateJump();
+
+  const u = new SpeechSynthesisUtterance(s.text);
+  const v = currentVoice();
+  if (v) { u.voice = v; u.lang = v.lang; } else if (R.book.lang) u.lang = R.book.lang;
+  u.rate = settings.rate;
+  let done = false;
+  const next = () => {
+    if (done || my !== R.token) return; done = true;
+    if (R.sleep.mode === 'min' && Date.now() >= R.sleep.until) { stopForSleep(); return; }
+    step(b, i + 1, my);
+  };
+  u.onend = () => { R.errs = 0; next(); };
+  u.onerror = e => {
+    if (my !== R.token || done) return;
+    if (e.error === 'interrupted' || e.error === 'canceled') return;
+    if (++R.errs > 3) { done = true; pause(); toast('Narration stopped (' + e.error + '). Try a different voice in Settings.', 6000); return; }
+    next();
+  };
+  R.utter = u; // keep a reference; some browsers drop events for collected utterances
+  synth.speak(u);
+  // Watchdog: a few engines occasionally never fire "end".
+  const guard = setInterval(() => {
+    if (done || my !== R.token) { clearInterval(guard); return; }
+    if (!synth.speaking && !synth.pending) { clearInterval(guard); next(); }
+  }, 2500);
+}
+
+function play() {
+  if (!synth || typeof SpeechSynthesisUtterance === 'undefined') { toast('This browser can’t read aloud. Try Chrome, Edge or Safari.', 5000); return; }
+  if (!R.blocks.length) { // nothing readable here (e.g. a cover page): start with the next chapter
+    R.playing = true; updatePlayUI(); acquireWake(); speakAt(0, 0); return;
+  }
+  R.playing = true; R.lastUser = 0; R.errs = 0;
+  updatePlayUI(); acquireWake();
+  const b = Math.min(R.pos.b, R.blocks.length - 1);
+  speakAt(b, sentenceAt(b, R.pos.c));
+}
+function pause() {
+  const wasPlaying = R.playing;
+  R.token++; R.playing = false;
+  if (synth) synth.cancel();
+  releaseWake(); updatePlayUI(); $('#jump').hidden = true;
+  if (wasPlaying && R.cur) {
+    const s = sentencesOf(R.cur.b)[R.cur.i];
+    if (s) {
+      mark(R.cur.b, s, 'resume');
+      R.pos = { ...R.pos, ch: R.ch, b: R.cur.b, c: s.start };
+      R.lastUser = 0;
+      scrollToPos(R.pos, true); // bring the paused sentence to the top, where reading picks up
+    }
+  }
+  R.cur = null;
+  flushSave(); updateProgressUI();
+}
+function stopForSleep() { R.sleep = { mode: 'off', until: 0 }; updateSleepUI(); pause(); toast('Sleep timer finished. Your place is saved.', 5000); }
+function updatePlayUI() {
+  $('#ico-play').hidden = R.playing; $('#ico-pause').hidden = !R.playing;
+  $('#play').setAttribute('aria-label', R.playing ? 'Pause' : 'Listen');
+  updateProgressUI();
+  if ('mediaSession' in navigator) { try { navigator.mediaSession.playbackState = R.playing ? 'playing' : 'paused'; } catch { /* ignore */ } }
+}
+$('#play').addEventListener('click', () => (R.playing ? pause() : play()));
+
+function skip(dir) {
+  if (!R.blocks.length) return;
+  let b = R.cur ? R.cur.b : Math.min(R.pos.b, R.blocks.length - 1);
+  let i = R.cur ? R.cur.i : sentenceAt(b, R.pos.c);
+  i += dir;
+  for (;;) {
+    if (b >= R.blocks.length) break;
+    if (i < 0) { if (b === 0) { i = 0; break; } b--; i = sentencesOf(b).length - 1; continue; }
+    if (i >= sentencesOf(b).length) { b++; i = 0; continue; }
+    break;
+  }
+  if (b >= R.blocks.length) {
+    if (R.playing) { speakAt(b, 0); return; }
+    if (R.ch + 1 < R.book.chapters.length) goChapter(R.ch + 1);
+    return;
+  }
+  if (R.playing) { R.lastUser = 0; speakAt(b, i); return; }
+  const s = sentencesOf(b)[i]; if (!s) return;
+  setPos({ ch: R.ch, b, c: s.start }, R.pos.mode || 'read');
+  mark(b, s, 'resume');
+  scrollToPos(R.pos, true);
+}
+$('#skip-back').addEventListener('click', () => skip(-1));
+$('#skip-fwd').addEventListener('click', () => skip(1));
+
+/* While narrating, tap a sentence to jump there. Links work as usual. */
+text.addEventListener('click', e => {
+  const a = e.target.closest('a');
+  if (a) {
+    if (a.target === '_blank') return;
+    e.preventDefault();
+    if (a.dataset.ch != null) goChapter(+a.dataset.ch, a.dataset.anchor || '');
+    return;
+  }
+  if (!R.playing) return;
+  let el = e.target;
+  while (el && el !== text && !R.blockIndex.has(el)) el = el.parentElement;
+  if (!el || !R.blockIndex.has(el)) return;
+  const b = R.blockIndex.get(el);
+  const hit = caretAt(e.clientX, e.clientY);
+  const c = hit && el.contains(hit.node) ? offsetIn(el, hit.node, hit.offset) : 0;
+  R.lastUser = 0;
+  speakAt(b, sentenceAt(b, c));
+});
+
+/* Speed and sleep timer */
+function updateSpeedUI() { $('#speed').textContent = settings.rate + '×'; $('#set-rate').value = String(settings.rate); }
+function setRate(r) {
+  settings.rate = r; saveSettings(); updateSpeedUI();
+  if (R.playing && R.cur) speakAt(R.cur.b, R.cur.i);
+}
+$('#speed').addEventListener('click', () => {
+  const k = RATES.indexOf(+settings.rate);
+  setRate(RATES[(k + 1) % RATES.length] ?? 1);
+});
+const SLEEP_STEPS = ['off', 15, 30, 60, 'chapter'];
+function updateSleepUI() {
+  const s = R.sleep, chip = $('#sleep'), label = $('#sleep-label');
+  chip.classList.toggle('on', s.mode !== 'off');
+  if (s.mode === 'off') label.textContent = 'Sleep';
+  else if (s.mode === 'chapter') label.textContent = 'End of ch.';
+  else label.textContent = Math.max(1, Math.ceil((s.until - Date.now()) / 60000)) + ' min';
+}
+$('#sleep').addEventListener('click', () => {
+  const cur = R.sleep.mode === 'off' ? 'off' : R.sleep.mode === 'chapter' ? 'chapter' : R.sleep.step;
+  const nxt = SLEEP_STEPS[(SLEEP_STEPS.indexOf(cur) + 1) % SLEEP_STEPS.length];
+  if (nxt === 'off') R.sleep = { mode: 'off', until: 0 };
+  else if (nxt === 'chapter') R.sleep = { mode: 'chapter', until: 0 };
+  else R.sleep = { mode: 'min', step: nxt, until: Date.now() + nxt * 60000 };
+  updateSleepUI();
+  toast(nxt === 'off' ? 'Sleep timer off.' : nxt === 'chapter' ? 'Narration will stop at the end of this chapter.' : 'Narration will stop in ' + nxt + ' minutes.');
+});
+setInterval(() => {
+  if (R.sleep.mode !== 'min') return;
+  updateSleepUI();
+  if (Date.now() >= R.sleep.until && !R.playing) { R.sleep = { mode: 'off', until: 0 }; updateSleepUI(); }
+}, 15000);
+
+/* =========================================================================
+   Opening, chapters, contents
+   ========================================================================= */
+async function openBook(id) {
+  let book;
+  try { book = await buildRuntimeBook(id); }
+  catch (e) { console.error(e); toast((e && e.message) || 'That book could not be opened.', 6000); return; }
+  if (R.book) closeBook(false);
+  R.book = book;
+  const saved = await getPosition(id);
+  const pos = saved && saved.ch < book.chapters.length ? saved : { ch: 0, b: 0, c: 0, mode: 'read' };
+  $('#library').hidden = true; $('#reader').hidden = false;
+  $('#r-title').textContent = book.title;
+  text.lang = book.lang || '';
+  text.innerHTML = '<p class="loading">Opening…</p>';
+  buildToc();
+  await renderChapter(pos.ch);
+  R.pos = { ch: pos.ch, b: Math.min(pos.b || 0, Math.max(0, R.blocks.length - 1)), c: pos.c || 0, mode: pos.mode || 'read', at: pos.at };
+  await nextFrame();
+  scrollToPos(R.pos);
+  // Show the bookmarked sentence so it is obvious where things pick up.
+  if (R.blocks.length && (R.pos.b || R.pos.c)) { const s = sentencesOf(R.pos.b)[sentenceAt(R.pos.b, R.pos.c)]; if (s) mark(R.pos.b, s, 'resume'); }
+  settle();
+  updateProgressUI(); updatePlayUI();
+  setMediaSession();
+}
+function closeBook(render = true) {
+  if (R.playing) pause();
+  flushSave();
+  for (const u of R.book?.urls?.values() || []) URL.revokeObjectURL(u);
+  R.book = null; R.blocks = []; R.cur = null; clearMarks();
+  text.replaceChildren();
+  if (render) { $('#reader').hidden = true; $('#library').hidden = false; renderLibrary(); }
+}
+$('#back').addEventListener('click', () => closeBook(true));
+
+async function goChapter(i, anchor = '') {
+  if (!R.book || i < 0 || i >= R.book.chapters.length) return;
+  const wasPlaying = R.playing;
+  if (wasPlaying) { R.token++; synth?.cancel(); }
+  if (i !== R.ch) await renderChapter(i);
+  await nextFrame();
+  let pos = { ch: i, b: 0, c: 0 };
+  const target = anchor && text.querySelector('#' + CSS.escape('bk-' + anchor));
+  if (target) { programmatic(150); page.scrollTop += target.getBoundingClientRect().top - page.getBoundingClientRect().top - TOP_PAD; pos = posFromScroll(); }
+  else { programmatic(150); page.scrollTop = 0; }
+  clearMarks();
+  setPos(pos, wasPlaying ? 'listen' : 'read');
+  settle();
+  if (wasPlaying) { R.cur = null; const b = Math.min(pos.b, Math.max(0, R.blocks.length - 1)); speakAt(R.blocks.length ? b : 0, R.blocks.length ? sentenceAt(b, pos.c) : 0); }
+}
+$('#prev-ch').addEventListener('click', () => goChapter(R.ch - 1));
+$('#next-ch').addEventListener('click', () => goChapter(R.ch + 1));
+
+function buildToc() {
+  const ol = $('#toc'); ol.replaceChildren();
+  const items = R.book.toc.length ? R.book.toc : R.book.chapters.map((c, i) => ({ label: 'Section ' + (i + 1), ch: i, anchor: '', depth: 0 }));
+  for (const t of items) {
+    const li = document.createElement('li');
+    const b = document.createElement('button'); b.type = 'button';
+    b.textContent = t.label; b.dataset.ch = t.ch; b.dataset.anchor = t.anchor || '';
+    b.style.paddingLeft = (8 + Math.min(t.depth, 4) * 16) + 'px';
+    li.appendChild(b); ol.appendChild(li);
+  }
+}
+function updateTocCurrent() {
+  let marked = false;
+  for (const b of document.querySelectorAll('#toc button')) {
+    const cur = !marked && +b.dataset.ch === R.ch;
+    b.setAttribute('aria-current', cur ? 'true' : 'false'); if (cur) marked = true;
+  }
+}
+$('#toc').addEventListener('click', e => {
+  const b = e.target.closest('button[data-ch]'); if (!b) return;
+  closeDrawers(); goChapter(+b.dataset.ch, b.dataset.anchor);
+});
+
+function setMediaSession() {
+  if (!('mediaSession' in navigator) || !R.book) return;
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({ title: R.book.title, artist: 'Folio' });
+    navigator.mediaSession.setActionHandler('play', () => { if (!R.playing) play(); });
+    navigator.mediaSession.setActionHandler('pause', () => { if (R.playing) pause(); });
+  } catch { /* not supported */ }
+}
+
+/* =========================================================================
+   Drawers and settings
+   ========================================================================= */
+function openDrawer(id) {
+  closeDrawers();
+  $('#scrim').hidden = false; const d = $(id); d.hidden = false;
+  d.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'center' });
+  d.querySelector('[data-close]')?.focus();
+}
+function closeDrawers() { for (const d of document.querySelectorAll('.drawer')) d.hidden = true; $('#scrim').hidden = true; }
+$('#open-toc').addEventListener('click', () => openDrawer('#toc-drawer'));
+$('#open-settings').addEventListener('click', () => { loadVoices(); openDrawer('#settings-drawer'); });
+$('#scrim').addEventListener('click', closeDrawers);
+for (const b of document.querySelectorAll('[data-close]')) b.addEventListener('click', closeDrawers);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawers(); });
+
+function fillVoices() {
+  const sel = $('#set-voice'); if (!sel) return;
+  const lang = (R.book?.lang || navigator.language || 'en').toLowerCase().slice(0, 2);
+  const sorted = [...voices].sort((a, b) => {
+    const am = (a.lang || '').toLowerCase().startsWith(lang) ? 0 : 1, bm = (b.lang || '').toLowerCase().startsWith(lang) ? 0 : 1;
+    return am - bm || voiceScore(b) - voiceScore(a) || a.name.localeCompare(b.name);
+  });
+  sel.replaceChildren(new Option(voices.length ? 'Automatic (best match for the book)' : 'Default voice', ''));
+  for (const v of sorted) sel.appendChild(new Option(v.name + ' · ' + v.lang, v.voiceURI));
+  sel.value = settings.voice || '';
+}
+$('#set-voice').addEventListener('change', e => {
+  settings.voice = e.target.value; saveSettings();
+  if (R.playing && R.cur) speakAt(R.cur.b, R.cur.i);
+});
+$('#test-voice').addEventListener('click', () => {
+  if (!synth) { toast('This browser can’t read aloud.'); return; }
+  if (R.playing) pause();
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance('This is how your book will sound.');
+  const v = currentVoice(); if (v) { u.voice = v; u.lang = v.lang; }
+  u.rate = settings.rate; synth.speak(u);
+});
+const rateSel = $('#set-rate');
+for (const r of RATES) rateSel.appendChild(new Option(r + '×' + (r === 1 ? ' (normal)' : ''), String(r)));
+rateSel.addEventListener('change', e => setRate(+e.target.value));
+$('#set-awake').addEventListener('change', e => { settings.awake = e.target.checked; saveSettings(); if (settings.awake && R.playing) acquireWake(); else if (!settings.awake) releaseWake(); });
+$('#set-follow').addEventListener('change', e => { settings.follow = e.target.checked; saveSettings(); });
+
+function applyLook(keepPlace = true) {
+  const keep = keepPlace && R.book && !R.playing ? { ...R.pos } : null;
+  document.documentElement.style.setProperty('--text-size', settings.size + 'px');
+  document.documentElement.style.setProperty('--book-font', settings.font === 'sans' ? 'var(--f-sans)' : 'var(--f-book)');
+  const reader = $('#reader');
+  if (settings.rtheme === 'auto') reader.removeAttribute('data-rtheme'); else reader.dataset.rtheme = settings.rtheme;
+  $('#size-out').textContent = settings.size + 'px';
+  if (keep) requestAnimationFrame(() => scrollToPos(keep));
+}
+$('#set-size').addEventListener('input', e => { settings.size = +e.target.value; saveSettings(); applyLook(); });
+for (const r of document.querySelectorAll('input[name=font]')) r.addEventListener('change', e => { settings.font = e.target.value; saveSettings(); applyLook(); });
+for (const r of document.querySelectorAll('input[name=rtheme]')) r.addEventListener('change', e => { settings.rtheme = e.target.value; saveSettings(); applyLook(false); });
+
+function syncSettingsForm() {
+  $('#set-size').value = settings.size;
+  $('#set-awake').checked = !!settings.awake;
+  $('#set-follow').checked = !!settings.follow;
+  const f = document.querySelector(`input[name=font][value="${settings.font}"]`); if (f) f.checked = true;
+  const t = document.querySelector(`input[name=rtheme][value="${settings.rtheme}"]`); if (t) t.checked = true;
+  updateSpeedUI(); fillVoices();
+}
+
+/* =========================================================================
+   Lifecycle
+   ========================================================================= */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushSave();
+  else if (R.playing) acquireWake();
+});
+window.addEventListener('pagehide', flushSave);
+
+(async function start() {
+  syncSettingsForm(); applyLook(false); updateSleepUI();
+  await ensureGuide();
+  await renderLibrary();
+  // Offline support when installed from a web server (not available everywhere).
+  try {
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && window.top === window && document.querySelector('link[rel=manifest]')) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  } catch { /* framed or unsupported */ }
+})();
+
+})();
+</script>
+</body><!--pwa-->
+</html><!--pwa-->
