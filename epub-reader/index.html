@@ -289,7 +289,7 @@ button{cursor:pointer}
       <label class="field" for="set-rate"><span>Speed</span><select id="set-rate"></select></label>
       <label class="check" for="set-awake"><input type="checkbox" id="set-awake"><span>Keep the screen on while listening</span></label>
       <label class="check" for="set-follow"><input type="checkbox" id="set-follow"><span>Scroll along with the narration</span></label>
-      <p class="hint">Voices come from this device. Ones named Natural, Enhanced or Premium usually sound best. On iPhone, more voices can be downloaded in Settings › Accessibility › Spoken Content.</p>
+      <p class="hint">Voices come from this device. On Android, “Phone’s voice” uses the voice chosen in Settings › Text-to-speech. On iPhone, better voices can be downloaded in Settings › Accessibility › Spoken Content.</p>
     </section>
     <section class="set-group">
       <h3>Page</h3>
@@ -338,6 +338,9 @@ function toast(msg, ms = 3200) {
 const RATES = [0.8, 1, 1.15, 1.3, 1.5, 1.75, 2];
 const settings = Object.assign({ rate: 1, voice: '', size: 19, font: 'serif', rtheme: 'auto', awake: true, follow: true }, loadLS('folio.settings') || {});
 const saveSettings = () => saveLS('folio.settings', settings);
+// One-time switch for Android: earlier versions picked a voice by language,
+// which can sound different from the voice chosen in the phone's settings.
+if (/Android/i.test(navigator.userAgent) && !settings.v2) { settings.voice = ''; settings.v2 = true; saveSettings(); }
 
 /* =========================================================================
    Storage: IndexedDB with an in-memory fallback
@@ -1048,17 +1051,36 @@ $('#jump').addEventListener('click', () => {
 /* =========================================================================
    Speech
    ========================================================================= */
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+/* Android reports locales like "en_US" or "bs_BA_#Latn"; speech needs "en-US". */
+function bcp47(l) { return String(l || '').replace(/_#.*$/, '').replace(/_/g, '-'); }
 const synth = typeof speechSynthesis !== 'undefined' ? speechSynthesis : null;
 let voices = [];
 function loadVoices() { if (!synth) return; voices = synth.getVoices(); fillVoices(); }
 if (synth) { loadVoices(); synth.addEventListener?.('voiceschanged', loadVoices); }
 function voiceScore(v) { return (/natural|neural|premium|enhanced|siri|google/i.test(v.name) ? 2 : 0) + (v.localService ? 0.5 : 0) + (v.default ? 0.25 : 0); }
+function bookLang() {
+  const book = bcp47(R.book?.lang || ''), dev = bcp47(navigator.language || 'en-US');
+  // A book tagged just "en" reads in the phone's own variety of English (e.g. en-US).
+  if (!book || (!book.includes('-') && dev.toLowerCase().startsWith(book.toLowerCase()))) return dev;
+  return book;
+}
 function currentVoice() {
   if (!voices.length) return null;
+  // On Android, Chrome's voice list is one entry per language from the phone's engine.
+  // Leaving the voice unset lets the phone use the exact voice picked in its own
+  // text-to-speech settings, which is what people hear when they test it there.
+  if (IS_ANDROID && !settings.voice) return null;
   if (settings.voice) { const v = voices.find(v => v.voiceURI === settings.voice); if (v) return v; }
   const lang = (R.book?.lang || navigator.language || 'en').toLowerCase().slice(0, 2);
   const m = voices.filter(v => (v.lang || '').toLowerCase().startsWith(lang));
   return m.sort((a, b) => voiceScore(b) - voiceScore(a))[0] || voices.find(v => v.default) || voices[0];
+}
+
+function applyVoice(u) {
+  const v = currentVoice();
+  if (v) { u.voice = v; u.lang = bcp47(v.lang); }
+  else u.lang = bookLang();
 }
 
 let wake = null;
@@ -1098,8 +1120,7 @@ async function step(b, i, my) {
   updateJump();
 
   const u = new SpeechSynthesisUtterance(s.text);
-  const v = currentVoice();
-  if (v) { u.voice = v; u.lang = v.lang; } else if (R.book.lang) u.lang = R.book.lang;
+  applyVoice(u);
   u.rate = settings.rate;
   let done = false;
   const next = () => {
@@ -1341,14 +1362,20 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawers
 
 function fillVoices() {
   const sel = $('#set-voice'); if (!sel) return;
-  const lang = (R.book?.lang || navigator.language || 'en').toLowerCase().slice(0, 2);
-  const sorted = [...voices].sort((a, b) => {
-    const am = (a.lang || '').toLowerCase().startsWith(lang) ? 0 : 1, bm = (b.lang || '').toLowerCase().startsWith(lang) ? 0 : 1;
-    return am - bm || voiceScore(b) - voiceScore(a) || a.name.localeCompare(b.name);
-  });
-  sel.replaceChildren(new Option(voices.length ? 'Automatic (best match for the book)' : 'Default voice', ''));
-  for (const v of sorted) sel.appendChild(new Option(v.name + ' · ' + v.lang, v.voiceURI));
+  const lang = bookLang().toLowerCase().slice(0, 2);
+  const matches = v => bcp47(v.lang).toLowerCase().startsWith(lang);
+  const byQuality = (a, b) => voiceScore(b) - voiceScore(a) || a.name.localeCompare(b.name);
+  const auto = IS_ANDROID ? 'Phone’s voice (from Android settings)' : voices.length ? 'Automatic (best match for the book)' : 'Default voice';
+  sel.replaceChildren(new Option(auto, ''));
+  const mine = voices.filter(matches).sort(byQuality), other = voices.filter(v => !matches(v)).sort(byQuality);
+  for (const [label, list] of [['Book’s language', mine], ['Other languages', other]]) {
+    if (!list.length) continue;
+    const g = document.createElement('optgroup'); g.label = label;
+    for (const v of list) g.appendChild(new Option(v.name + ' · ' + bcp47(v.lang), v.voiceURI));
+    sel.appendChild(g);
+  }
   sel.value = settings.voice || '';
+  if (sel.value !== (settings.voice || '')) sel.value = '';
 }
 $('#set-voice').addEventListener('change', e => {
   settings.voice = e.target.value; saveSettings();
@@ -1359,7 +1386,7 @@ $('#test-voice').addEventListener('click', () => {
   if (R.playing) pause();
   synth.cancel();
   const u = new SpeechSynthesisUtterance('This is how your book will sound.');
-  const v = currentVoice(); if (v) { u.voice = v; u.lang = v.lang; }
+  applyVoice(u);
   u.rate = settings.rate; synth.speak(u);
 });
 const rateSel = $('#set-rate');
